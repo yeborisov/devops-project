@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   security:
@@ -27,13 +28,33 @@ jobs:
           python -m pip install --upgrade pip
           pip install bandit pip-audit
 
+      - name: Prepare report directory
+        run: |
+          mkdir -p reports
+
       - name: Run Bandit (Python static analysis)
         run: |
-          bandit -r . -x .venv,venv,tests
+          set +e
+          bandit -r . -x .venv,venv,tests -f txt -o reports/bandit.txt
+          BANDIT_EXIT=$?
+          # bandit: 0=no issues, 1=issues found, >1=configuration/runtime error
+          if [ $BANDIT_EXIT -gt 1 ]; then
+            echo "Bandit failed with exit code $BANDIT_EXIT"
+            exit $BANDIT_EXIT
+          fi
+          exit 0
 
       - name: Run pip-audit (dependency vulnerability scan)
         run: |
-          pip-audit -r requirements.txt
+          set +e
+          pip-audit -r requirements.txt > reports/pip-audit.txt
+          PIPAUDIT_EXIT=$?
+          # pip-audit: 0=no issues, 1=issues found, >1=configuration/runtime error
+          if [ $PIPAUDIT_EXIT -gt 1 ]; then
+            echo "pip-audit failed with exit code $PIPAUDIT_EXIT"
+            exit $PIPAUDIT_EXIT
+          fi
+          exit 0
 
       - name: Run Trivy FS scan
         uses: aquasecurity/trivy-action@0.24.0
@@ -42,3 +63,101 @@ jobs:
           scan-ref: '.'
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
+          format: 'table'
+          output: 'reports/trivy.txt'
+          exit-code: '0'
+
+      - name: Combine security report
+        run: |
+          WORKFLOW_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          BANDIT_STATUS="✅ No issues"
+          PIPAUDIT_STATUS="✅ No issues"
+          TRIVY_STATUS="✅ No issues"
+
+          if ! grep -q "No issues identified" reports/bandit.txt; then
+            BANDIT_STATUS="⚠️ Issues found"
+          fi
+          if ! grep -q "No known vulnerabilities found" reports/pip-audit.txt; then
+            PIPAUDIT_STATUS="⚠️ Issues found"
+          fi
+          if ! grep -q "Total: 0" reports/trivy.txt; then
+            TRIVY_STATUS="⚠️ Issues found"
+          fi
+
+          {
+            echo "# 🛡️ Security Scan Report";
+            echo "";
+            echo "**Workflow Run:** ${WORKFLOW_URL}";
+            echo "";
+            echo "| Scanner | Status |";
+            echo "|---|---|";
+            echo "| Bandit | ${BANDIT_STATUS} |";
+            echo "| pip-audit | ${PIPAUDIT_STATUS} |";
+            echo "| Trivy | ${TRIVY_STATUS} |";
+            echo "";
+            echo "---";
+            echo "";
+            echo "## Bandit";
+            echo "";
+            cat reports/bandit.txt || echo "No Bandit report";
+            echo "";
+            echo "## pip-audit";
+            echo "";
+            cat reports/pip-audit.txt || echo "No pip-audit report";
+            echo "";
+            echo "## Trivy";
+            echo "";
+            cat reports/trivy.txt || echo "No Trivy report";
+          } > reports/SECURITY_REPORT.md
+
+      - name: Check if issues exist
+        id: check-issues
+        run: |
+          HAS_ISSUES=false
+          if ! grep -q "No issues identified" reports/bandit.txt; then
+            HAS_ISSUES=true
+          fi
+          if ! grep -q "No known vulnerabilities found" reports/pip-audit.txt; then
+            HAS_ISSUES=true
+          fi
+          if ! grep -q "Total: 0" reports/trivy.txt; then
+            HAS_ISSUES=true
+          fi
+          echo "HAS_ISSUES=$HAS_ISSUES" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Issue with report (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.check-issues.outputs.HAS_ISSUES == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('reports/SECURITY_REPORT.md', 'utf8');
+            const date = new Date().toISOString().slice(0, 10);
+            const titlePrefix = 'Security Scan Report';
+            const title = `${titlePrefix} - ${date}`;
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'security'
+            });
+
+            const existing = issues.find(i => i.title.startsWith(titlePrefix));
+
+            if (existing) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['security']
+              });
+            }
