@@ -95,6 +95,13 @@ GitHub Actions automatically on every push to `main`:
 
 Image is available at: `ghcr.io/yeborisov/devops-project:latest`
 
+### Security Checks
+
+GitHub Actions runs security scans on every push and PR to `main`:
+- **Bandit**: Python static analysis
+- **pip-audit**: Python dependency vulnerability scan
+- **Trivy**: filesystem vulnerability scan
+
 ### Continuous Deployment (CD)
 
 **Automated infrastructure + application deployment via GitHub Actions:**

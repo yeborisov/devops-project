@@ -56,7 +56,7 @@ By default, Terraform stores state locally in `terraform.tfstate`. For productio
 
 1. **Run the setup script** (creates S3 bucket and DynamoDB table):
    ```bash
-   ./setup-remote-state.sh
+   # Remote state setup is handled automatically in the GitHub Actions workflow.
    ```
 
    This creates:

@@ -276,7 +276,7 @@ infrastructure manually before running the workflow:
 
 ```bash
 cd terraform
-./setup-remote-state.sh  # Creates S3 bucket and DynamoDB table
+# Remote state setup is handled automatically in the GitHub Actions workflow.
 terraform init           # Initializes backend
 ```
 
