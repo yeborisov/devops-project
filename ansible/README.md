@@ -65,6 +65,29 @@ curl http://$EC2_IP/
 curl http://$EC2_IP/hostname
 ```
 
+## GitHub Actions Integration
+
+The Ansible playbook is also used by GitHub Actions for automated deployments.
+See [../.github/workflows/deploy.yml](../.github/workflows/deploy.yml) for the full workflow.
+
+The workflow:
+1. Runs Terraform to provision infrastructure
+2. Gets EC2 IP from Terraform output
+3. Creates inventory dynamically
+4. Runs this Ansible playbook
+5. Verifies deployment
+
+## What the Playbook Does
+
+The `deploy.yml` playbook:
+- ✅ Ensures Docker is installed and running
+- ✅ Pulls the specified Docker image (from GHCR or builds from repo)
+- ✅ Stops and removes existing container (if any)
+- ✅ Starts new container on port 80 with restart policy
+- ✅ Validates deployment
+
+All operations are idempotent - you can run it multiple times safely.
+
 ## Troubleshooting
 
 Check if the container is running:
@@ -75,4 +98,9 @@ ssh -i ~/.ssh/devops-project-key ec2-user@$EC2_IP "docker ps"
 View container logs:
 ```bash
 ssh -i ~/.ssh/devops-project-key ec2-user@$EC2_IP "docker logs simple-rest"
+```
+
+Check Ansible connectivity:
+```bash
+ansible -i inventory -m ping all
 ```

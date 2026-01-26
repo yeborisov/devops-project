@@ -1,6 +1,24 @@
+"""
+Simple REST Service - DevOps Project
+
+A minimalist Flask application that demonstrates containerized deployment
+with Docker, Terraform, and Ansible.
+
+Endpoints:
+    GET /          - Returns "Hello World" as plain text
+    GET /hostname  - Returns container/server hostname as JSON
+
+Environment Variables:
+    PORT - Server port (default: 5000)
+
+Usage:
+    python main.py --port 8080
+    python main.py  # Uses PORT env var or defaults to 5000
+"""
 from flask import Flask, jsonify, Response
 import socket
 
+# Initialize Flask application
 app = Flask(__name__)
 
 @app.route("/", methods=["GET"])

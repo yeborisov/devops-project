@@ -1,6 +1,17 @@
-## Provider configuration moved to provider.tf
+## EC2 Infrastructure Configuration
+##
+## This Terraform configuration creates a minimal EC2 setup for hosting
+## a containerized REST service. It includes:
+## - SSH key pair for secure access
+## - Security group with HTTP (80) and optional SSH (22) access
+## - EC2 instance with Docker pre-installed via user-data
+## - Automatic instance type selection based on region (free-tier friendly)
+##
+## Provider configuration is in provider.tf
+## State backend configuration is in backend.tf
 
 # SSH Key Pair for EC2 access
+# Creates a key pair from the provided public key (typically from GitHub Secrets)
 resource "aws_key_pair" "deployer" {
   count      = var.ssh_public_key != "" ? 1 : 0
   key_name   = var.ssh_key_name
@@ -90,24 +101,28 @@ resource "aws_instance" "web" {
     Name = "simple-rest-ec2"
   }
 
-  # User data: Install Docker and Python for Ansible
-  # Container deployment is handled by Ansible for better control and repeatability
+  # User data script runs on first boot to prepare the instance for deployment
+  # This installs Docker and prepares the environment for Ansible
+  # The actual container deployment is handled by Ansible for better control
   user_data = <<-EOF
               #!/bin/bash
-              set -e
+              set -e  # Exit on any error
 
-              # Install Docker (Amazon Linux 2023 uses dnf)
+              # Update system and install Docker (Amazon Linux 2023 uses dnf, not yum)
               dnf update -y || true
               dnf install -y docker || true
+
+              # Start Docker service and enable it to run on boot
               systemctl enable --now docker
 
-              # Python3 is pre-installed on Amazon Linux 2023
+              # Python3 is pre-installed on Amazon Linux 2023, but ensure pip is available
               dnf install -y python3-pip || true
 
-              # Add ec2-user to docker group for non-root access
+              # Add ec2-user to docker group for non-root Docker access
+              # This allows Ansible to manage containers without sudo
               usermod -aG docker ec2-user || true
 
-              # Signal completion
+              # Log completion for debugging purposes
               echo "EC2 user-data completed successfully" > /var/log/user-data.log
   EOF
 }

@@ -78,11 +78,16 @@ Image is available at: `ghcr.io/yeborisov/devops-project:latest`
 
 ### Continuous Deployment (CD)
 
-**Manual deployment via GitHub Actions:**
-- Go to **Actions** → **Deploy to AWS EC2** → **Run workflow**
-- Enter EC2 IP address and optionally specify image version
+**Automated infrastructure + application deployment via GitHub Actions:**
+- Go to **Actions** → **Deploy Infrastructure and Application** → **Run workflow**
+- Workflow automatically:
+  - Sets up S3 backend for Terraform state (if needed)
+  - Provisions EC2 infrastructure with Terraform
+  - Deploys application with Ansible
+  - Verifies deployment with automated tests
+- Optionally specify Docker image version
 - Deployment requires approval from code owners
-- Automated verification tests run after deployment
+- Complete automation from infrastructure to application
 
 📖 **See [DEPLOYMENT.md](DEPLOYMENT.md) for complete setup guide**
 
@@ -154,13 +159,25 @@ You have two options for deployment:
 
 #### Option A: GitHub Actions (Recommended)
 
-Automated deployment with approval workflow:
+Fully automated deployment with approval workflow. The workflow handles everything:
+- Terraform state management (S3 + DynamoDB)
+- Infrastructure provisioning (EC2, Security Groups, SSH keys)
+- Application deployment with Ansible
+- Automated verification
 
-1. **Add SSH key to GitHub Secrets:**
+1. **Add required secrets to GitHub:**
    ```bash
    # Repository → Settings → Secrets and variables → Actions
-   # Add secret: EC2_SSH_PRIVATE_KEY
-   # Value: content of ~/.ssh/devops-project-key
+   # Add the following secrets:
+
+   # EC2_SSH_PRIVATE_KEY - Your SSH private key
+   cat ~/.ssh/devops-project-key
+
+   # SSH_PUBLIC_KEY - Your SSH public key
+   cat ~/.ssh/devops-project-key.pub
+
+   # AWS_ACCESS_KEY_ID - From AWS IAM credentials
+   # AWS_SECRET_ACCESS_KEY - From AWS IAM credentials
    ```
 
 2. **Setup production environment:**
@@ -169,10 +186,12 @@ Automated deployment with approval workflow:
    - Save protection rules
 
 3. **Deploy:**
-   - Go to **Actions** → **Deploy to AWS EC2** → **Run workflow**
-   - Enter EC2 IP: `terraform output -raw instance_public_ip`
+   - Go to **Actions** → **Deploy Infrastructure and Application** → **Run workflow**
+   - Choose terraform action: `apply` (or `plan-only` to preview)
+   - Optionally specify Docker image version
    - Click **Run workflow**
    - Approve when prompted
+   - Workflow automatically provisions infrastructure and deploys application
 
 📖 **See [DEPLOYMENT.md](DEPLOYMENT.md) for complete GitHub Actions setup**
 
@@ -292,4 +311,46 @@ ssh -i ~/.ssh/devops-project-key ec2-user@$EC2_IP "docker logs simple-rest"
 - Check security group allows HTTP (port 80)
 - Verify Docker container is running on port 80
 - Check EC2 instance status in AWS console
+
+## Current Deployment
+
+**Live Application**: http://3.68.33.85 (if deployed)
+
+Infrastructure managed by:
+- **Terraform** - EC2 instance on Amazon Linux 2023 (t3.micro in eu-central-1)
+- **Ansible** - Docker container deployment and management
+- **S3 + DynamoDB** - Terraform remote state backend with locking
+
+Container Image: `ghcr.io/yeborisov/devops-project:latest`
+
+## Architecture
+
+```
+┌─────────────────┐
+│  GitHub Actions │  Push code → Build → Test → Push to GHCR
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Deploy Workflow│  Manual trigger → Approve → Deploy
+└────────┬────────┘
+         │
+         ├──────────────────┐
+         ▼                  ▼
+    ┌─────────┐        ┌──────────┐
+    │Terraform│        │ Ansible  │
+    │         │        │          │
+    │• EC2    │ ────▶  │• Docker  │
+    │• SG     │        │• Deploy  │
+    │• Keys   │        │• Verify  │
+    └─────────┘        └──────────┘
+         │                  │
+         ▼                  ▼
+    ┌─────────────────────────┐
+    │  AWS EC2 (eu-central-1) │
+    │  Amazon Linux 2023       │
+    │  Docker Container        │
+    │  Port 80 (HTTP)          │
+    └─────────────────────────┘
+```
 
