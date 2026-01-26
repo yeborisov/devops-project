@@ -32,7 +32,6 @@ jobs:
         run: |
           mkdir -p reports
           chmod -R 777 reports
-          mkdir -p "$RUNNER_TEMP/reports"
 
       - name: Run Bandit (Python static analysis)
         run: |
@@ -74,15 +73,14 @@ jobs:
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
           format: 'table'
-          output: '${{ runner.temp }}/reports/trivy.txt'
+          output: '${{ github.workspace }}/reports/trivy.txt'
           exit-code: '0'
 
       - name: Normalize Trivy output
         run: |
-          if [ ! -s "$RUNNER_TEMP/reports/trivy.txt" ]; then
-            echo "No issues found" > "$RUNNER_TEMP/reports/trivy.txt"
+          if [ ! -s "reports/trivy.txt" ]; then
+            echo "No issues found" > reports/trivy.txt
           fi
-          cp "$RUNNER_TEMP/reports/trivy.txt" reports/trivy.txt
 
       - name: Combine security report
         run: |
