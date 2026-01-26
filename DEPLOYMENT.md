@@ -241,7 +241,7 @@ View deployment history:
 
 ### Terraform State Management
 
-**Current Setup:**
+**Current Setup (Default):**
 - Terraform state is **NOT persisted** between workflow runs
 - Each workflow run starts with fresh state
 - This means Terraform will try to create new resources each time
@@ -251,15 +251,38 @@ View deployment history:
 - ⚠️ You should manually destroy old instances: `terraform destroy` locally
 - ⚠️ Or use AWS Console to terminate old instances before re-running
 
-**Recommended for Production:**
-- Set up **Terraform Remote State** (S3 backend)
-- This persists state between runs and enables team collaboration
-- See `terraform/` directory for backend configuration examples
+**Recommended for Production (Remote State):**
 
-**Current Best Practice:**
-- Use this workflow for **initial deployment**
-- For updates, use the workflow with existing infrastructure
-- Or run Terraform locally for infrastructure changes
+Set up **Terraform Remote State** (S3 backend) to persist state between runs:
+
+1. **Setup Remote State** (one-time):
+   ```bash
+   cd terraform
+   ./setup-remote-state.sh
+   ```
+
+2. **Enable backend**:
+   - Edit `terraform/backend.tf`
+   - Uncomment the `terraform` block
+
+3. **Migrate local state**:
+   ```bash
+   cd terraform
+   terraform init -migrate-state
+   ```
+
+4. **Update workflow**:
+   - The workflow will automatically use remote state on next run
+   - No more duplicate instances!
+
+**Benefits of Remote State:**
+- ✅ State persists between workflow runs
+- ✅ No duplicate resources created
+- ✅ Team collaboration (multiple people can work on same infrastructure)
+- ✅ State locking (prevents concurrent modifications)
+- ✅ State versioning and encryption
+
+See [terraform/README.md](terraform/README.md) for detailed instructions.
 
 ## Next Steps
 
