@@ -31,6 +31,7 @@ jobs:
       - name: Prepare report directory
         run: |
           mkdir -p reports
+          chmod -R 777 reports
 
       - name: Run Bandit (Python static analysis)
         run: |
@@ -173,5 +174,31 @@ jobs:
                 title,
                 body,
                 labels: ['security']
+              });
+            }
+
+      - name: Close existing security issue when clean (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.check-issues.outputs.HAS_ISSUES == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const titlePrefix = 'Security Scan Report';
+            const fs = require('fs');
+            const body = fs.readFileSync('reports/SECURITY_REPORT.md', 'utf8');
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'security'
+            });
+
+            const existing = issues.find(i => i.title.startsWith(titlePrefix));
+            if (existing) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+                state: 'closed'
               });
             }
