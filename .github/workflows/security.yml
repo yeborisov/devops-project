@@ -129,10 +129,12 @@ jobs:
           } > reports/SECURITY_REPORT.md
 
       - name: Upload security reports (artifact)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: security-reports-${{ github.run_id }}
           path: reports/
+          retention-days: 90
 
       - name: Check if issues exist
         id: check-issues
@@ -176,13 +178,25 @@ jobs:
                 issue_number: existing.number,
                 body
               });
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body: `🔄 Updated security report:\n\n${body}`
+              });
             } else {
-              await github.rest.issues.create({
+              const created = await github.rest.issues.create({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 title,
                 body,
                 labels: ['security']
+              });
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: created.data.number,
+                body: `🆕 Security report created:\n\n${body}`
               });
             }
 
