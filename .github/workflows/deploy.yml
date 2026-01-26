@@ -1,4 +1,4 @@
-name: Deploy to AWS EC2
+name: Deploy Infrastructure and Application
 
 on:
   workflow_dispatch:
@@ -8,11 +8,14 @@ on:
         required: false
         default: 'ghcr.io/yeborisov/devops-project:latest'
         type: string
-      aws_region:
-        description: 'AWS region (default: eu-central-1)'
+      terraform_action:
+        description: 'Terraform action (apply/plan-only)'
         required: false
-        default: 'eu-central-1'
-        type: string
+        default: 'apply'
+        type: choice
+        options:
+          - apply
+          - plan-only
 
 jobs:
   deploy:
@@ -28,31 +31,70 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ inputs.aws_region }}
+          aws-region: eu-central-1
 
-      - name: Get EC2 instance IP
-        id: get-ip
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.6.0"
+          terraform_wrapper: false
+
+      - name: Create Terraform tfvars
         run: |
-          EC2_IP=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=simple-rest-ec2" \
-                      "Name=instance-state-name,Values=running" \
-            --query "Reservations[0].Instances[0].PublicIpAddress" \
-            --output text)
+          cd terraform
+          cat > terraform.tfvars <<EOF
+          aws_region = "eu-central-1"
+          instance_type = ""
+          allow_ssh = true
+          ssh_key_name = "devops-project-key"
+          ssh_public_key = "${{ secrets.SSH_PUBLIC_KEY }}"
+          EOF
 
-          if [ "$EC2_IP" == "None" ] || [ -z "$EC2_IP" ]; then
-            echo "❌ No running EC2 instance found with tag Name=simple-rest-ec2"
+      - name: Terraform Init
+        run: |
+          cd terraform
+          terraform init
+
+      - name: Terraform Plan
+        run: |
+          cd terraform
+          terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        if: inputs.terraform_action == 'apply'
+        run: |
+          cd terraform
+          terraform apply -auto-approve tfplan
+
+      - name: Get EC2 IP from Terraform
+        id: get-ip
+        if: inputs.terraform_action == 'apply'
+        run: |
+          cd terraform
+          EC2_IP=$(terraform output -raw instance_public_ip)
+
+          if [ -z "$EC2_IP" ]; then
+            echo "❌ Failed to get EC2 IP from Terraform output"
             exit 1
           fi
 
           echo "EC2_IP=$EC2_IP" >> $GITHUB_OUTPUT
-          echo "✅ Found EC2 instance: $EC2_IP"
+          echo "✅ EC2 instance IP: $EC2_IP"
+
+      - name: Wait for EC2 to be ready
+        if: inputs.terraform_action == 'apply'
+        run: |
+          echo "Waiting 60 seconds for EC2 user-data to complete..."
+          sleep 60
 
       - name: Install Ansible
+        if: inputs.terraform_action == 'apply'
         run: |
           sudo apt-get update
           sudo apt-get install -y ansible
 
       - name: Setup SSH key
+        if: inputs.terraform_action == 'apply'
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
@@ -60,6 +102,7 @@ jobs:
           ssh-keyscan -H ${{ steps.get-ip.outputs.EC2_IP }} >> ~/.ssh/known_hosts
 
       - name: Create Ansible inventory
+        if: inputs.terraform_action == 'apply'
         run: |
           cat > ansible/inventory <<EOF
           [webservers]
@@ -67,6 +110,7 @@ jobs:
           EOF
 
       - name: Deploy with Ansible
+        if: inputs.terraform_action == 'apply'
         run: |
           cd ansible
           ansible-playbook -i inventory deploy.yml \
@@ -74,6 +118,7 @@ jobs:
             -v
 
       - name: Verify deployment
+        if: inputs.terraform_action == 'apply'
         run: |
           echo "Waiting 10 seconds for container to start..."
           sleep 10

@@ -36,10 +36,19 @@ Add the following secrets to your GitHub repository:
   # Paste into GitHub secret
   ```
 
+- **SSH_PUBLIC_KEY**: Your SSH public key for creating EC2 key pair
+  ```bash
+  # Display your public key
+  cat ~/.ssh/devops-project-key.pub
+
+  # Copy the entire content (starts with ssh-rsa)
+  # Paste into GitHub secret
+  ```
+
 - **AWS_ACCESS_KEY_ID**: Your AWS access key
   ```bash
   # Get from AWS IAM user credentials
-  # The workflow uses this to find the EC2 instance automatically
+  # The workflow uses this to provision infrastructure with Terraform
   ```
 
 - **AWS_SECRET_ACCESS_KEY**: Your AWS secret access key
@@ -81,39 +90,60 @@ Update with your GitHub username if different.
 
 ## How to Deploy
 
-### Option 1: Deploy Latest Image
+### Option 1: Full Infrastructure + Application Deployment
 
 1. Go to **Actions** tab in GitHub
-2. Select **Deploy to AWS EC2** workflow
+2. Select **Deploy Infrastructure and Application** workflow
 3. Click **Run workflow**
-4. Fill in the inputs (optional):
+4. Fill in the inputs:
    - **Docker image**: Leave default for latest, or specify version
-   - **AWS region**: Leave default (eu-central-1) or specify your region
+   - **Terraform action**: Choose `apply` for full deployment
 5. Click **Run workflow**
-6. **Wait for automatic EC2 discovery**: The workflow will find your EC2 instance by tag
-7. **Approve the deployment** when prompted (if you're a code owner)
-8. Watch the deployment progress
+6. **Approve the deployment** when prompted (if you're a code owner)
+7. Watch the deployment progress
 
-### Option 2: Deploy Specific Version
+The workflow will:
+- Run Terraform to create/update EC2 infrastructure
+- Get the EC2 IP address from Terraform output
+- Deploy the application with Ansible
+- Verify the deployment
 
-Same as above, but specify a tag in the Docker image field:
+### Option 2: Terraform Plan Only (Preview Changes)
+
+Same as above, but select **Terraform action: plan-only**. This will show you what Terraform will do without actually applying changes.
+
+### Option 3: Deploy Specific Version
+
+Specify a tag in the Docker image field:
 ```
 ghcr.io/yeborisov/devops-project:v1.2.3
 ```
 
-**Note**: The workflow automatically finds your EC2 instance by looking for the tag `Name=simple-rest-ec2`. No need to manually enter the IP address!
+**Note**: The workflow now runs Terraform and gets the EC2 IP directly from Terraform output!
 
 ## What Happens During Deployment
 
 1. ✅ Checks out repository code
 2. ✅ Configures AWS credentials
-3. ✅ Automatically finds EC2 instance by tag (`Name=simple-rest-ec2`)
-4. ✅ Installs Ansible
-5. ✅ Sets up SSH connection to EC2
-6. ✅ Creates Ansible inventory dynamically
-7. ✅ Runs Ansible playbook to deploy container
-8. ✅ Verifies deployment by testing endpoints
-9. ✅ Reports deployment status
+3. ✅ Sets up Terraform
+4. ✅ Creates Terraform tfvars with secrets (SSH keys)
+5. ✅ Runs `terraform init`
+6. ✅ Runs `terraform plan`
+7. ✅ Runs `terraform apply` (creates/updates EC2 infrastructure)
+8. ✅ Gets EC2 IP address from Terraform output
+9. ✅ Waits for EC2 user-data to complete (Docker installation)
+10. ✅ Installs Ansible
+11. ✅ Sets up SSH connection to EC2
+12. ✅ Creates Ansible inventory dynamically
+13. ✅ Runs Ansible playbook to deploy container
+14. ✅ Verifies deployment by testing endpoints
+15. ✅ Reports deployment status
+
+**Key Benefits:**
+- Full infrastructure automation (no manual Terraform runs needed)
+- Terraform state managed in workflow
+- EC2 IP directly from Terraform output (always accurate)
+- Single workflow for infrastructure + application deployment
 
 ## Deployment Approval Flow
 
@@ -131,20 +161,32 @@ Since we use the `production` environment:
 
 **Solution:**
 1. Add **AWS_ACCESS_KEY_ID** and **AWS_SECRET_ACCESS_KEY** secrets in Repository Settings → Secrets
-2. Ensure the AWS IAM user has `ec2:DescribeInstances` permission
+2. Ensure the AWS IAM user has permissions for EC2, including:
+   - `ec2:*` (for Terraform to create resources)
+   - Or more restrictive: `ec2:RunInstances`, `ec2:DescribeInstances`, `ec2:CreateKeyPair`, etc.
 3. Verify the credentials are correct and not expired
 
-### "No running EC2 instance found with tag Name=simple-rest-ec2"
+### "SSH_PUBLIC_KEY secret not found"
 
 **Solution:**
-1. Check that your EC2 instance is running: `terraform output`
-2. Verify the instance has the correct tag: `Name=simple-rest-ec2`
-3. Ensure you're deploying to the correct AWS region (default: eu-central-1)
-4. If you changed the instance name in Terraform, update the workflow or use the old name
+1. Add **SSH_PUBLIC_KEY** secret in Repository Settings → Secrets
+2. Get the public key: `cat ~/.ssh/devops-project-key.pub`
+3. Copy the entire content (starts with `ssh-rsa`)
 
 ### "EC2_SSH_PRIVATE_KEY secret not found"
 
 **Solution:** Add the secret in Repository Settings → Secrets
+
+### Terraform errors during apply
+
+**Solution:**
+1. Check the workflow logs for specific Terraform errors
+2. Common issues:
+   - AWS quotas/limits reached
+   - Invalid SSH key format
+   - Security group conflicts
+   - Region-specific AMI not available
+3. You can test locally: `cd terraform && terraform plan`
 
 ### "Waiting for approval from environment protection rules"
 
@@ -195,8 +237,33 @@ View deployment history:
 - Filter by status (success/failure)
 - Click on any run to see logs
 
+## Important Notes
+
+### Terraform State Management
+
+**Current Setup:**
+- Terraform state is **NOT persisted** between workflow runs
+- Each workflow run starts with fresh state
+- This means Terraform will try to create new resources each time
+
+**Implications:**
+- ⚠️ Running the workflow multiple times will create duplicate EC2 instances
+- ⚠️ You should manually destroy old instances: `terraform destroy` locally
+- ⚠️ Or use AWS Console to terminate old instances before re-running
+
+**Recommended for Production:**
+- Set up **Terraform Remote State** (S3 backend)
+- This persists state between runs and enables team collaboration
+- See `terraform/` directory for backend configuration examples
+
+**Current Best Practice:**
+- Use this workflow for **initial deployment**
+- For updates, use the workflow with existing infrastructure
+- Or run Terraform locally for infrastructure changes
+
 ## Next Steps
 
+- **Set up Terraform Remote State** (S3 backend) for production use
 - Set up Slack/Email notifications for deployment events
 - Add deployment frequency limits
 - Configure staging environment for testing before production
