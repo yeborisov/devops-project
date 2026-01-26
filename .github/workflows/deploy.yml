@@ -230,8 +230,21 @@ jobs:
       - name: Wait for SSH to become available
         if: inputs.terraform_action == 'apply'
         run: |
+          IP="${{ steps.get-ip.outputs.EC2_IP }}"
+          echo "Waiting for TCP port 22 on ${IP}..."
+          OPEN=false
+          for i in {1..24}; do
+            if timeout 2 bash -c "cat < /dev/null > /dev/tcp/${IP}/22" 2>/dev/null; then
+              OPEN=true
+              break
+            fi
+            sleep 5
+          done
+          if [ "$OPEN" != "true" ]; then
+            echo "SSH port 22 did not become reachable within 120 seconds."
+            exit 1
+          fi
           cd ansible
-          ansible -i inventory all -m wait_for -a "port=22 timeout=120 delay=5" -v
           ansible -i inventory all -m wait_for_connection -a "timeout=120 delay=5" -v
 
       - name: Deploy with Ansible
