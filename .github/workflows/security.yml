@@ -128,6 +128,12 @@ jobs:
             cat reports/trivy.txt || echo "No Trivy report";
           } > reports/SECURITY_REPORT.md
 
+      - name: Upload security reports (artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports-${{ github.run_id }}
+          path: reports/
+
       - name: Check if issues exist
         id: check-issues
         run: |
@@ -197,6 +203,12 @@ jobs:
 
             const existing = issues.find(i => i.title.startsWith(titlePrefix));
             if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body: `✅ No findings. Closing issue.\n\n${body}`
+              });
               await github.rest.issues.update({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
