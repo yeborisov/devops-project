@@ -126,24 +126,29 @@ ghcr.io/yeborisov/devops-project:v1.2.3
 1. ✅ Checks out repository code
 2. ✅ Configures AWS credentials
 3. ✅ Sets up Terraform
-4. ✅ Creates Terraform tfvars with secrets (SSH keys)
-5. ✅ Runs `terraform init`
-6. ✅ Runs `terraform plan`
-7. ✅ Runs `terraform apply` (creates/updates EC2 infrastructure)
-8. ✅ Gets EC2 IP address from Terraform output
-9. ✅ Waits for EC2 user-data to complete (Docker installation)
-10. ✅ Installs Ansible
-11. ✅ Sets up SSH connection to EC2
-12. ✅ Creates Ansible inventory dynamically
-13. ✅ Runs Ansible playbook to deploy container
-14. ✅ Verifies deployment by testing endpoints
-15. ✅ Reports deployment status
+4. ✅ **Automatically sets up S3 backend** (if not exists)
+   - Creates S3 bucket with versioning and encryption
+   - Creates DynamoDB table for state locking
+   - Enables backend configuration
+5. ✅ Creates Terraform tfvars with secrets (SSH keys)
+6. ✅ Runs `terraform init` (uses S3 remote state)
+7. ✅ Runs `terraform plan`
+8. ✅ Runs `terraform apply` (creates/updates EC2 infrastructure)
+9. ✅ Gets EC2 IP address from Terraform output
+10. ✅ Waits for EC2 user-data to complete (Docker installation)
+11. ✅ Installs Ansible
+12. ✅ Sets up SSH connection to EC2
+13. ✅ Creates Ansible inventory dynamically
+14. ✅ Runs Ansible playbook to deploy container
+15. ✅ Verifies deployment by testing endpoints
+16. ✅ Reports deployment status
 
 **Key Benefits:**
-- Full infrastructure automation (no manual Terraform runs needed)
-- Terraform state managed in workflow
+- Full infrastructure automation (no manual setup needed)
+- **Automatic S3 backend setup** on first run
+- Terraform state persisted in S3 (no duplicates)
 - EC2 IP directly from Terraform output (always accurate)
-- Single workflow for infrastructure + application deployment
+- Single workflow for everything (infrastructure + application)
 
 ## Deployment Approval Flow
 
@@ -253,27 +258,29 @@ View deployment history:
 
 **Recommended for Production (Remote State):**
 
-Set up **Terraform Remote State** (S3 backend) to persist state between runs:
+The workflow **automatically sets up** Terraform Remote State (S3 backend) on first run:
 
-1. **Setup Remote State** (one-time):
-   ```bash
-   cd terraform
-   ./setup-remote-state.sh
-   ```
+- On first workflow run, it automatically:
+  1. Creates S3 bucket (if not exists)
+  2. Creates DynamoDB table (if not exists)
+  3. Enables backend configuration in `backend.tf`
+  4. Terraform will use remote state automatically
 
-2. **Enable backend**:
-   - Edit `terraform/backend.tf`
-   - Uncomment the `terraform` block
+- On subsequent runs:
+  - Uses existing S3 backend
+  - No duplicate instances created
+  - State persists between runs
 
-3. **Migrate local state**:
-   ```bash
-   cd terraform
-   terraform init -migrate-state
-   ```
+**Manual setup (optional):**
 
-4. **Update workflow**:
-   - The workflow will automatically use remote state on next run
-   - No more duplicate instances!
+If you want to set up remote state locally before running the workflow:
+
+```bash
+cd terraform
+./setup-remote-state.sh
+```
+
+Then edit `terraform/backend.tf` and uncomment the `terraform` block.
 
 **Benefits of Remote State:**
 - ✅ State persists between workflow runs

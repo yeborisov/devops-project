@@ -39,6 +39,81 @@ jobs:
           terraform_version: "1.6.0"
           terraform_wrapper: false
 
+      - name: Setup Terraform Remote State Backend (if needed)
+        run: |
+          BUCKET_NAME="devops-project-terraform-state"
+          DYNAMODB_TABLE="devops-project-terraform-locks"
+          REGION="eu-central-1"
+
+          echo "🔍 Checking if Terraform backend infrastructure exists..."
+
+          # Check if S3 bucket exists
+          if aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
+            echo "✅ S3 bucket already exists: $BUCKET_NAME"
+          else
+            echo "📦 Creating S3 bucket: $BUCKET_NAME"
+            aws s3api create-bucket \
+              --bucket "$BUCKET_NAME" \
+              --region "$REGION" \
+              --create-bucket-configuration LocationConstraint="$REGION"
+
+            echo "🔄 Enabling versioning..."
+            aws s3api put-bucket-versioning \
+              --bucket "$BUCKET_NAME" \
+              --versioning-configuration Status=Enabled
+
+            echo "🔒 Enabling encryption..."
+            aws s3api put-bucket-encryption \
+              --bucket "$BUCKET_NAME" \
+              --server-side-encryption-configuration '{
+                "Rules": [{
+                  "ApplyServerSideEncryptionByDefault": {
+                    "SSEAlgorithm": "AES256"
+                  }
+                }]
+              }'
+
+            echo "🛡️  Blocking public access..."
+            aws s3api put-public-access-block \
+              --bucket "$BUCKET_NAME" \
+              --public-access-block-configuration \
+                "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+
+            echo "✅ S3 bucket created and configured"
+          fi
+
+          # Check if DynamoDB table exists
+          if aws dynamodb describe-table --table-name "$DYNAMODB_TABLE" --region "$REGION" &>/dev/null; then
+            echo "✅ DynamoDB table already exists: $DYNAMODB_TABLE"
+          else
+            echo "🗄️  Creating DynamoDB table: $DYNAMODB_TABLE"
+            aws dynamodb create-table \
+              --table-name "$DYNAMODB_TABLE" \
+              --attribute-definitions AttributeName=LockID,AttributeType=S \
+              --key-schema AttributeName=LockID,KeyType=HASH \
+              --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 \
+              --region "$REGION"
+
+            echo "⏳ Waiting for table to be active..."
+            aws dynamodb wait table-exists --table-name "$DYNAMODB_TABLE" --region "$REGION"
+            echo "✅ DynamoDB table created"
+          fi
+
+          echo "🎉 Terraform backend infrastructure is ready!"
+
+      - name: Enable Terraform Backend Configuration
+        run: |
+          cd terraform
+          # Check if backend is already uncommented
+          if grep -q "^terraform {" backend.tf; then
+            echo "✅ Backend configuration already enabled"
+          else
+            echo "🔧 Enabling backend configuration in backend.tf"
+            # Uncomment the terraform backend block
+            sed -i.bak '/^# terraform {/,/^# }/s/^# //' backend.tf
+            echo "✅ Backend configuration enabled"
+          fi
+
       - name: Create Terraform tfvars
         run: |
           cd terraform
