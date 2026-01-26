@@ -25,7 +25,7 @@ Add the following secrets to your GitHub repository:
 
 **Repository → Settings → Secrets and variables → Actions → New repository secret**
 
-#### Required Secret:
+#### Required Secrets:
 
 - **EC2_SSH_PRIVATE_KEY**: Your SSH private key for EC2 access
   ```bash
@@ -34,6 +34,18 @@ Add the following secrets to your GitHub repository:
 
   # Copy the entire content (including BEGIN/END lines)
   # Paste into GitHub secret
+  ```
+
+- **AWS_ACCESS_KEY_ID**: Your AWS access key
+  ```bash
+  # Get from AWS IAM user credentials
+  # The workflow uses this to find the EC2 instance automatically
+  ```
+
+- **AWS_SECRET_ACCESS_KEY**: Your AWS secret access key
+  ```bash
+  # Get from AWS IAM user credentials
+  # Keep this secret safe - never commit to git
   ```
 
 ### Step 2: Configure Production Environment
@@ -74,12 +86,13 @@ Update with your GitHub username if different.
 1. Go to **Actions** tab in GitHub
 2. Select **Deploy to AWS EC2** workflow
 3. Click **Run workflow**
-4. Fill in the inputs:
-   - **EC2 Public IP**: Your EC2 instance IP (from `terraform output`)
-   - **Docker image**: Leave default or specify version
+4. Fill in the inputs (optional):
+   - **Docker image**: Leave default for latest, or specify version
+   - **AWS region**: Leave default (eu-central-1) or specify your region
 5. Click **Run workflow**
-6. **Approve the deployment** when prompted (if you're a code owner)
-7. Watch the deployment progress
+6. **Wait for automatic EC2 discovery**: The workflow will find your EC2 instance by tag
+7. **Approve the deployment** when prompted (if you're a code owner)
+8. Watch the deployment progress
 
 ### Option 2: Deploy Specific Version
 
@@ -88,15 +101,19 @@ Same as above, but specify a tag in the Docker image field:
 ghcr.io/yeborisov/devops-project:v1.2.3
 ```
 
+**Note**: The workflow automatically finds your EC2 instance by looking for the tag `Name=simple-rest-ec2`. No need to manually enter the IP address!
+
 ## What Happens During Deployment
 
 1. ✅ Checks out repository code
-2. ✅ Installs Ansible
-3. ✅ Sets up SSH connection to EC2
-4. ✅ Creates Ansible inventory dynamically
-5. ✅ Runs Ansible playbook to deploy container
-6. ✅ Verifies deployment by testing endpoints
-7. ✅ Reports deployment status
+2. ✅ Configures AWS credentials
+3. ✅ Automatically finds EC2 instance by tag (`Name=simple-rest-ec2`)
+4. ✅ Installs Ansible
+5. ✅ Sets up SSH connection to EC2
+6. ✅ Creates Ansible inventory dynamically
+7. ✅ Runs Ansible playbook to deploy container
+8. ✅ Verifies deployment by testing endpoints
+9. ✅ Reports deployment status
 
 ## Deployment Approval Flow
 
@@ -109,6 +126,21 @@ Since we use the `production` environment:
 5. **Verification** → Automated tests confirm deployment
 
 ## Troubleshooting
+
+### "AWS credentials not found" or "Unable to locate credentials"
+
+**Solution:**
+1. Add **AWS_ACCESS_KEY_ID** and **AWS_SECRET_ACCESS_KEY** secrets in Repository Settings → Secrets
+2. Ensure the AWS IAM user has `ec2:DescribeInstances` permission
+3. Verify the credentials are correct and not expired
+
+### "No running EC2 instance found with tag Name=simple-rest-ec2"
+
+**Solution:**
+1. Check that your EC2 instance is running: `terraform output`
+2. Verify the instance has the correct tag: `Name=simple-rest-ec2`
+3. Ensure you're deploying to the correct AWS region (default: eu-central-1)
+4. If you changed the instance name in Terraform, update the workflow or use the old name
 
 ### "EC2_SSH_PRIVATE_KEY secret not found"
 

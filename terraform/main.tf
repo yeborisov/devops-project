@@ -11,13 +11,13 @@ resource "aws_key_pair" "deployer" {
   }
 }
 
-# Lookup a recent Amazon Linux 2 AMI for the region
-data "aws_ami" "amazon_linux2" {
+# Lookup a recent Amazon Linux 2023 AMI for the region
+data "aws_ami" "amazon_linux" {
   most_recent = true
   owners      = ["amazon"]
   filter {
     name   = "name"
-    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+    values = ["al2023-ami-2023.*-x86_64"]
   }
 }
 
@@ -80,7 +80,7 @@ resource "aws_security_group_rule" "ssh" {
 
 # EC2 instance with public IP. The instance will use the selected instance type.
 resource "aws_instance" "web" {
-  ami                         = data.aws_ami.amazon_linux2.id
+  ami                         = data.aws_ami.amazon_linux.id
   instance_type               = local.selected_instance_type
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.http.id]
@@ -96,14 +96,13 @@ resource "aws_instance" "web" {
               #!/bin/bash
               set -e
 
-              # Install Docker
-              yum update -y || true
-              amazon-linux-extras enable docker || true
-              yum install -y docker || true
+              # Install Docker (Amazon Linux 2023 uses dnf)
+              dnf update -y || true
+              dnf install -y docker || true
               systemctl enable --now docker
 
-              # Install Python3 and pip (required by Ansible)
-              yum install -y python3 python3-pip || true
+              # Python3 is pre-installed on Amazon Linux 2023
+              dnf install -y python3-pip || true
 
               # Add ec2-user to docker group for non-root access
               usermod -aG docker ec2-user || true
