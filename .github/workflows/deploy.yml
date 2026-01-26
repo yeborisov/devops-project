@@ -171,9 +171,25 @@ jobs:
       - name: Setup SSH key
         if: inputs.terraform_action == 'apply'
         run: |
+          # Fail fast and show commands (we'll temporarily disable xtrace when writing the secret)
+          set -euo pipefail
+
           mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 700 ~/.ssh
+
+          # Write the private key without xtrace so it won't be leaked in logs
+          set +x
+          printf '%s\n' "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          set -x
+
+          # Diagnostics: show size and line count of the written key (does not reveal contents)
+          echo "deploy_key bytes: $(wc -c < ~/.ssh/deploy_key)"
+          echo "deploy_key lines: $(wc -l < ~/.ssh/deploy_key)"
+          ls -la ~/.ssh
+
           chmod 600 ~/.ssh/deploy_key
+
+          # Add host to known_hosts. Let ssh-keyscan fail if there's an error so CI shows diagnostics.
           ssh-keyscan -H ${{ steps.get-ip.outputs.EC2_IP }} >> ~/.ssh/known_hosts
 
       - name: Create Ansible inventory
