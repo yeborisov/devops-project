@@ -1,0 +1,62 @@
+name: Deploy to AWS EC2
+
+on:
+  workflow_dispatch:
+    inputs:
+      ec2_host:
+        description: 'EC2 Public IP or hostname'
+        required: true
+        type: string
+      docker_image:
+        description: 'Docker image to deploy'
+        required: false
+        default: 'ghcr.io/yeborisov/devops-project:latest'
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: http://${{ inputs.ec2_host }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ansible
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ inputs.ec2_host }} >> ~/.ssh/known_hosts
+
+      - name: Create Ansible inventory
+        run: |
+          cat > ansible/inventory <<EOF
+          [webservers]
+          ${{ inputs.ec2_host }} ansible_user=ec2-user ansible_ssh_private_key_file=~/.ssh/deploy_key
+          EOF
+
+      - name: Deploy with Ansible
+        run: |
+          cd ansible
+          ansible-playbook -i inventory deploy.yml \
+            -e "image=${{ inputs.docker_image }}" \
+            -v
+
+      - name: Verify deployment
+        run: |
+          echo "Waiting 10 seconds for container to start..."
+          sleep 10
+
+          echo "Testing application endpoints:"
+          curl -f http://${{ inputs.ec2_host }}/ || (echo "Root endpoint failed" && exit 1)
+          curl -f http://${{ inputs.ec2_host }}/hostname || (echo "Hostname endpoint failed" && exit 1)
+
+          echo "✅ Deployment successful!"
+          echo "🌐 Application URL: http://${{ inputs.ec2_host }}"

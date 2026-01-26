@@ -67,12 +67,24 @@ curl http://localhost/hostname
 
 ## CI/CD Pipeline
 
-GitHub Actions automatically:
-1. Runs tests on push to `main`
-2. Builds Docker image
-3. Pushes to GitHub Container Registry (ghcr.io)
+### Continuous Integration (CI)
+
+GitHub Actions automatically on every push to `main`:
+1. ✅ Runs tests
+2. ✅ Builds Docker image
+3. ✅ Pushes to GitHub Container Registry (ghcr.io)
 
 Image is available at: `ghcr.io/yeborisov/devops-project:latest`
+
+### Continuous Deployment (CD)
+
+**Manual deployment via GitHub Actions:**
+- Go to **Actions** → **Deploy to AWS EC2** → **Run workflow**
+- Enter EC2 IP address and optionally specify image version
+- Deployment requires approval from code owners
+- Automated verification tests run after deployment
+
+📖 **See [DEPLOYMENT.md](DEPLOYMENT.md) for complete setup guide**
 
 ## AWS Deployment Guide
 
@@ -136,7 +148,37 @@ terraform output
 
 **Important**: Terraform only provisions the EC2 instance and installs Docker. The application container is deployed separately using Ansible in the next step.
 
-### Step 4: Deploy Application with Ansible
+### Step 4: Deploy Application
+
+You have two options for deployment:
+
+#### Option A: GitHub Actions (Recommended)
+
+Automated deployment with approval workflow:
+
+1. **Add SSH key to GitHub Secrets:**
+   ```bash
+   # Repository → Settings → Secrets and variables → Actions
+   # Add secret: EC2_SSH_PRIVATE_KEY
+   # Value: content of ~/.ssh/devops-project-key
+   ```
+
+2. **Setup production environment:**
+   - Repository → Settings → Environments → New environment: `production`
+   - Add required reviewers (yourself)
+   - Save protection rules
+
+3. **Deploy:**
+   - Go to **Actions** → **Deploy to AWS EC2** → **Run workflow**
+   - Enter EC2 IP: `terraform output -raw instance_public_ip`
+   - Click **Run workflow**
+   - Approve when prompted
+
+📖 **See [DEPLOYMENT.md](DEPLOYMENT.md) for complete GitHub Actions setup**
+
+#### Option B: Local Ansible Deployment
+
+Manual deployment from your machine:
 
 ```bash
 cd ../ansible

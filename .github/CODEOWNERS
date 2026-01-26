@@ -1,0 +1,12 @@
+# Code owners for this repository
+# These users have permission to approve deployments and review code
+
+# Default owner for everything in the repo
+* @yeborisov
+
+# Infrastructure code requires approval
+/terraform/ @yeborisov
+/ansible/ @yeborisov
+
+# Deployment workflows require approval
+/.github/workflows/deploy.yml @yeborisov
