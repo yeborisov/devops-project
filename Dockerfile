@@ -23,6 +23,7 @@ COPY . /app
 
 # Default to port 80 inside the container
 ENV PORT=80
+ENV BIND_HOST=0.0.0.0
 EXPOSE 80
 
 # Start the application; main.py reads PORT env var

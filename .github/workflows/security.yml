@@ -35,7 +35,7 @@ jobs:
       - name: Run Bandit (Python static analysis)
         run: |
           set +e
-          bandit -r . -x .venv,venv,tests -f txt -o reports/bandit.txt
+          bandit -r . -c bandit.yaml -f txt -o reports/bandit.txt
           BANDIT_EXIT=$?
           # bandit: 0=no issues, 1=issues found, >1=configuration/runtime error
           if [ $BANDIT_EXIT -gt 1 ]; then

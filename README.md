@@ -46,6 +46,9 @@ pip install -r requirements.txt
 # Run the app
 python main.py -p 8080
 
+# Bind host (defaults to localhost for safety)
+export BIND_HOST="127.0.0.1"
+
 # Optional security settings
 # Restrict access to a single hostname (Host header). Leave empty to disable.
 export ALLOWED_HOST="example.com"

@@ -1,0 +1,7 @@
+exclude_dirs:
+  - .venv
+  - venv
+  - tests
+
+per_file_ignores:
+  - tests/*.py:B101

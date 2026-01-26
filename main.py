@@ -39,6 +39,11 @@ def _get_basic_auth_credentials():
     return user, password
 
 
+def _get_bind_host() -> str:
+    """Return bind host for app.run; defaults to localhost for safety."""
+    return os.environ.get("BIND_HOST", "127.0.0.1").strip() or "127.0.0.1"
+
+
 def _is_auth_enabled() -> bool:
     """Return True if auth is enabled via AUTH_ENABLED env var."""
     return os.environ.get("AUTH_ENABLED", "").strip().lower() in {"1", "true", "yes", "on"}
@@ -210,4 +215,4 @@ if __name__ == "__main__":
         # If PORT env var is set but not an int, fall back to 5000
         port = 5000
 
-    app.run(host="0.0.0.0", port=port)
+    app.run(host=_get_bind_host(), port=port)
