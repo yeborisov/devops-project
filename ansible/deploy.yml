@@ -1,0 +1,93 @@
+---
+hosts: all
+become: true
+name: Deploy app container on target hosts
+vars:
+  # If you provide repo_url, the playbook will clone the repository and build the image from the Dockerfile there.
+  # Otherwise it will try to pull the image specified by `image` from a registry.
+  repo_url: ""            # e.g. https://github.com/your-org/your-repo.git
+  app_path: "/opt/devops-project"
+  image: "devops-project:latest"
+  container_name: "simple-rest"
+  ghcr_username: ""
+  ghcr_token: ""
+
+tasks:
+  - name: Ensure git is installed
+    package:
+      name: git
+      state: present
+
+  - name: Check whether Docker is installed
+    command: docker --version
+    register: docker_check
+    ignore_errors: true
+
+  - name: Download Docker install script
+    get_url:
+      url: https://get.docker.com
+      dest: /tmp/get-docker.sh
+      mode: '0755'
+    when: docker_check.rc != 0
+
+  - name: Run Docker install script
+    command: sh /tmp/get-docker.sh
+    when: docker_check.rc != 0
+
+  - name: Ensure docker service is started and enabled
+    service:
+      name: docker
+      state: started
+      enabled: true
+
+  - name: Add current user to docker group (best-effort)
+    user:
+      name: "{{ ansible_user | default('ec2-user') }}"
+      groups: docker
+      append: yes
+    ignore_errors: true
+
+  - name: Ensure application directory exists
+    file:
+      path: "{{ app_path }}"
+      state: directory
+      owner: root
+      group: root
+      mode: '0755'
+
+  - name: Clone repository (if repo_url provided)
+    git:
+      repo: "{{ repo_url }}"
+      dest: "{{ app_path }}"
+      update: yes
+    when: repo_url != ''
+
+  - name: Build Docker image from repository (if repo_url provided)
+    shell: docker build -t {{ image }} .
+    args:
+      chdir: "{{ app_path }}"
+    when: repo_url != ''
+
+  - name: Pull image from registry (if no repo_url)
+    # If GHCR credentials are provided, login first
+    shell: |
+      if [ "{{ ghcr_username }}" != "" ] && [ "{{ ghcr_token }}" != "" ]; then
+        echo "{{ ghcr_token }}" | docker login ghcr.io -u "{{ ghcr_username }}" --password-stdin || true
+      fi
+      docker pull {{ image }}
+    when: repo_url == ''
+
+  - name: Stop and remove existing container (if present)
+    shell: |
+      if [ "$(docker ps -aq -f name={{ container_name }})" ]; then
+        docker rm -f {{ container_name }} || true
+      fi
+    ignore_errors: true
+
+  - name: Run container exposing port 80
+    shell: docker run -d --name {{ container_name }} -p 80:80 --restart unless-stopped {{ image }}
+    register: run_result
+
+  - name: Show container id
+    debug:
+      var: run_result.stdout

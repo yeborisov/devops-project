@@ -1,0 +1,7 @@
+[webservers]
+# Replace with your EC2 instance public IP from terraform output
+# Get it with: terraform -chdir=terraform output instance_public_ip
+your.ec2.public.ip ansible_user=ec2-user ansible_ssh_private_key_file=~/.ssh/devops-project-key
+
+# Example:
+# 54.123.45.67 ansible_user=ec2-user ansible_ssh_private_key_file=~/.ssh/devops-project-key
