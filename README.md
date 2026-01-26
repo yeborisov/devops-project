@@ -121,7 +121,7 @@ cd terraform
 cp terraform.tfvars.example terraform.tfvars
 
 # Edit terraform.tfvars with your settings
-nano terraform.tfvars
+vi terraform.tfvars
 ```
 
 Update the SSH public key in `terraform.tfvars`:

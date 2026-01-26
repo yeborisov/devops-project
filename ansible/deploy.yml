@@ -1,18 +1,18 @@
 ---
-hosts: all
-become: true
-name: Deploy app container on target hosts
-vars:
-  # If you provide repo_url, the playbook will clone the repository and build the image from the Dockerfile there.
-  # Otherwise it will try to pull the image specified by `image` from a registry.
-  repo_url: ""            # e.g. https://github.com/your-org/your-repo.git
-  app_path: "/opt/devops-project"
-  image: "devops-project:latest"
-  container_name: "simple-rest"
-  ghcr_username: ""
-  ghcr_token: ""
+- hosts: all
+  become: true
+  name: Deploy app container on target hosts
+  vars:
+    # If you provide repo_url, the playbook will clone the repository and build the image from the Dockerfile there.
+    # Otherwise it will try to pull the image specified by `image` from a registry.
+    repo_url: ""            # e.g. https://github.com/your-org/your-repo.git
+    app_path: "/opt/devops-project"
+    image: "devops-project:latest"
+    container_name: "simple-rest"
+    ghcr_username: ""
+    ghcr_token: ""
 
-tasks:
+  tasks:
   - name: Ensure git is installed
     package:
       name: git
