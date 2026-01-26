@@ -173,8 +173,7 @@ INDEX_HTML = """
 # A tiny 16x16 favicon (generated as a small red square) encoded as ICO-like PNG data for simplicity.
 # This is a minimal inline image (PNG) served as image/x-icon; browsers accept PNG too.
 FAVICON_BASE64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAQAAAC1+jfqAAAAH0lEQVQoz2NgoBvgP4P8n4GBgYGBgYGBg"
-    "AAAABJRU5ErkJggg=="
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII="
 )
 
 
