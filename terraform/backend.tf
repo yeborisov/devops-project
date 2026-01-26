@@ -7,15 +7,15 @@
 # 3. Uncomment the terraform block below
 # 4. Run: terraform init -migrate-state
 
-# terraform {
-#   backend "s3" {
-#     bucket         = "devops-project-terraform-state"  # Change to your bucket name
-#     key            = "prod/terraform.tfstate"          # Path within the bucket
-#     region         = "eu-central-1"
-#     encrypt        = true                              # Enable encryption at rest
-#     dynamodb_table = "devops-project-terraform-locks"  # For state locking
-#   }
-# }
+terraform {
+  backend "s3" {
+    bucket         = "devops-project-terraform-state"  # Change to your bucket name
+    key            = "prod/terraform.tfstate"          # Path within the bucket
+    region         = "eu-central-1"
+    encrypt        = true                              # Enable encryption at rest
+    dynamodb_table = "devops-project-terraform-locks"  # For state locking
+  }
+}
 
 # Prerequisites setup (run these AWS CLI commands first):
 #
