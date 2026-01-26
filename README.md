@@ -6,6 +6,9 @@ A simple Flask REST service with automated CI/CD, containerization, and AWS depl
 
 - `GET /` — returns plain text "Hello World"
 - `GET /hostname` — returns JSON with the machine hostname: `{ "hostname": "..." }`
+- `GET /health` — returns JSON health status
+- `GET /info` — returns JSON runtime info
+- `GET /index` or `/index.html` — HTML landing page (protected with basic auth when enabled)
 
 ## Project Structure
 
@@ -43,9 +46,25 @@ pip install -r requirements.txt
 # Run the app
 python main.py -p 8080
 
+# Optional security settings
+# Restrict access to a single hostname (Host header). Leave empty to disable.
+export ALLOWED_HOST="example.com"
+
+# Enable HTTP Basic Auth only when HTTPS is used.
+export AUTH_ENABLED="true"
+
+# Protect the HTML index with HTTP Basic Auth. Leave empty to disable.
+export BASIC_AUTH_USER="admin"
+export BASIC_AUTH_PASS="secret"
+
 # Test endpoints
 curl http://127.0.0.1:8080/
 curl http://127.0.0.1:8080/hostname
+curl http://127.0.0.1:8080/health
+curl http://127.0.0.1:8080/info
+
+# HTML index (protected if BASIC_AUTH_* is set)
+curl -u admin:secret http://127.0.0.1:8080/index
 
 # Run tests
 pytest -q
