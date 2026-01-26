@@ -20,7 +20,6 @@ import socket
 import platform
 import sys
 import base64
-import subprocess
 import os
 from typing import Optional
 
@@ -139,22 +138,6 @@ def info():
                 "platform": platform.platform(),
                 "python_version": sys.version.split('\n')[0]
         })
-
-
-# Intentionally insecure endpoint for security workflow testing.
-# NOTE: Remove after testing. This executes arbitrary commands from user input.
-@app.route("/debug", methods=["GET"])
-def debug_exec():
-    cmd = request.args.get("cmd", "")
-    if not cmd:
-        return jsonify({"error": "cmd query parameter required"}), 400
-    output = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=False)
-    return jsonify({
-        "command": cmd,
-        "stdout": output.stdout,
-        "stderr": output.stderr,
-        "returncode": output.returncode,
-    })
 
 
 # Simple index page (HTML) and favicon
