@@ -130,11 +130,11 @@ jobs:
         run: |
           cd terraform
           # Build SSH CIDR list: detected runner IP plus any additional CIDRs from secrets
-          SSH_CIDRS="\"${{ steps.detect-ip.outputs.RUNNER_IP }}/32\""
+          SSH_CIDRS="\"${{ steps.detect-ip.outputs.RUNNER_IP }}/17\""
           if [ -n "${{ secrets.SSH_ALLOWED_CIDR }}" ]; then
             SSH_CIDRS="$SSH_CIDRS,\"${{ secrets.SSH_ALLOWED_CIDR }}\""
           fi
-          # Enable SSH only when a user-provided CIDR is present
+          # Enable SSH during provisioning when a CIDR is provided
           if [ -n "${{ secrets.SSH_ALLOWED_CIDR }}" ]; then
             ALLOW_SSH=true
           else
@@ -228,7 +228,8 @@ jobs:
         if: inputs.terraform_action == 'apply'
         run: |
           cd ansible
-          ansible -i inventory all -m wait_for_connection -a "timeout=300 delay=10" -v
+          ansible -i inventory all -m wait_for -a "port=22 timeout=120 delay=5" -v
+          ansible -i inventory all -m wait_for_connection -a "timeout=120 delay=5" -v
 
       - name: Deploy with Ansible
         if: inputs.terraform_action == 'apply'
@@ -237,6 +238,28 @@ jobs:
           ansible-playbook -i inventory deploy.yml \
             -e "image=${{ inputs.docker_image }}" \
             -v
+
+      - name: Disable SSH access after deployment
+        if: inputs.terraform_action == 'apply'
+        run: |
+          if [ -z "${{ secrets.SSH_ALLOWED_CIDR }}" ]; then
+            echo "SSH_ALLOWED_CIDR not set; skipping SSH disable step."
+            exit 0
+          fi
+          cd terraform
+          SSH_CIDRS="\"${{ steps.detect-ip.outputs.RUNNER_IP }}/17\""
+          if [ -n "${{ secrets.SSH_ALLOWED_CIDR }}" ]; then
+            SSH_CIDRS="$SSH_CIDRS,\"${{ secrets.SSH_ALLOWED_CIDR }}\""
+          fi
+          cat > terraform.tfvars <<EOF
+          aws_region = "eu-central-1"
+          instance_type = ""
+          allow_ssh = false
+          ssh_allowed_cidrs = [${SSH_CIDRS}]
+          ssh_key_name = "devops-project-key"
+          ssh_public_key = "${{ secrets.SSH_PUBLIC_KEY }}"
+          EOF
+          terraform apply -auto-approve
 
       - name: Verify deployment
         if: inputs.terraform_action == 'apply'
