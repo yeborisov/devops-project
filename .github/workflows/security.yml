@@ -73,7 +73,7 @@ jobs:
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
           format: 'table'
-          output: '${{ github.workspace }}/reports/trivy.txt'
+          output: '/github/workspace/reports/trivy.txt'
           exit-code: '0'
 
       - name: Normalize Trivy output
