@@ -1,4 +1,16 @@
-# AWS Configuration
+aws_region       = "eu-central-1"
+instance_type    = ""
+allow_ssh        = true
+# Restrict SSH to your public IP (example):
+ssh_allowed_cidr = "203.0.113.4/32"
+ssh_key_name     = "devops-project-key"
+ssh_public_key   = "ssh-rsa AAAA..."
+
+# Docker image to deploy (if using user-data or other automation)
+docker_image     = "ghcr.io/OWNER/REPO:latest"
+# Leave credentials empty for public images
+ghcr_username    = ""
+ghcr_token       = ""# AWS Configuration
 aws_region = "us-east-1"  # or "eu-central-1", "us-west-2", etc.
 
 # EC2 Instance Type (optional - will auto-select free tier if empty)

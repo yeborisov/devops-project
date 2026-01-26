@@ -121,6 +121,7 @@ jobs:
           aws_region = "eu-central-1"
           instance_type = ""
           allow_ssh = true
+          ssh_allowed_cidr = "${{ secrets.SSH_ALLOWED_CIDR }}"
           ssh_key_name = "devops-project-key"
           ssh_public_key = "${{ secrets.SSH_PUBLIC_KEY }}"
           EOF

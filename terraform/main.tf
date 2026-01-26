@@ -64,6 +64,17 @@ resource "aws_security_group" "http" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  dynamic "ingress" {
+    for_each = var.allow_ssh && length(trimspace(var.ssh_allowed_cidr)) > 0 ? [1] : []
+    content {
+      description = "SSH"
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      cidr_blocks = [var.ssh_allowed_cidr]
+    }
+  }
+
   # Allow all outbound
   egress {
     from_port   = 0
@@ -77,17 +88,9 @@ resource "aws_security_group" "http" {
   }
 }
 
-# SSH access security group rule (conditional)
-resource "aws_security_group_rule" "ssh" {
-  count             = var.allow_ssh ? 1 : 0
-  type              = "ingress"
-  from_port         = 22
-  to_port           = 22
-  protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.http.id
-  description       = "SSH"
-}
+## NOTE: SSH ingress is handled by the dynamic `ingress` block above which uses
+## `var.ssh_allowed_cidr`. The previous separate `aws_security_group_rule` that
+## opened SSH to 0.0.0.0/0 has been removed to avoid accidentally exposing SSH.
 
 # EC2 instance with public IP. The instance will use the selected instance type.
 resource "aws_instance" "web" {

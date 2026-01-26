@@ -27,3 +27,9 @@ variable "ssh_public_key" {
   type        = string
   default     = ""
 }
+
+variable "ssh_allowed_cidr" {
+  description = "CIDR that is allowed to SSH to the instance. Leave empty to disable SSH ingress."
+  type        = string
+  default     = ""
+}
