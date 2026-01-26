@@ -48,8 +48,11 @@ jobs:
             echo "Failed to detect runner public IP"
             exit 1
           fi
+          RUNNER_CIDR=$(python -c "import ipaddress, os; ip=os.environ['RUNNER_IP']; print(ipaddress.ip_network(f'{ip}/17', strict=False))")
           echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_OUTPUT
+          echo "RUNNER_CIDR=$RUNNER_CIDR" >> $GITHUB_OUTPUT
           echo "Detected runner IP: $RUNNER_IP"
+          echo "Derived runner CIDR: $RUNNER_CIDR"
 
       - name: Setup Terraform Remote State Backend (if needed)
         run: |
@@ -130,7 +133,7 @@ jobs:
         run: |
           cd terraform
           # Build SSH CIDR list: detected runner IP plus any additional CIDRs from secrets
-          SSH_CIDRS="\"${{ steps.detect-ip.outputs.RUNNER_IP }}/17\""
+          SSH_CIDRS="\"${{ steps.detect-ip.outputs.RUNNER_CIDR }}\""
           if [ -n "${{ secrets.SSH_ALLOWED_CIDR }}" ]; then
             SSH_CIDRS="$SSH_CIDRS,\"${{ secrets.SSH_ALLOWED_CIDR }}\""
           fi
@@ -247,7 +250,7 @@ jobs:
             exit 0
           fi
           cd terraform
-          SSH_CIDRS="\"${{ steps.detect-ip.outputs.RUNNER_IP }}/17\""
+          SSH_CIDRS="\"${{ steps.detect-ip.outputs.RUNNER_CIDR }}\""
           if [ -n "${{ secrets.SSH_ALLOWED_CIDR }}" ]; then
             SSH_CIDRS="$SSH_CIDRS,\"${{ secrets.SSH_ALLOWED_CIDR }}\""
           fi
