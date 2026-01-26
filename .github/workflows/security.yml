@@ -78,8 +78,11 @@ jobs:
 
       - name: Normalize Trivy output
         run: |
+          if [ -f "reports/trivy.txt" ]; then
+            sudo chmod a+rw reports/trivy.txt
+          fi
           if [ ! -s "reports/trivy.txt" ]; then
-            echo "No issues found" > reports/trivy.txt
+            sudo bash -c 'echo "No issues found" > reports/trivy.txt'
           fi
 
       - name: Combine security report
