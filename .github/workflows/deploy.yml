@@ -137,12 +137,8 @@ jobs:
           if [ -n "${{ secrets.SSH_ALLOWED_CIDR }}" ]; then
             SSH_CIDRS="$SSH_CIDRS,\"${{ secrets.SSH_ALLOWED_CIDR }}\""
           fi
-          # Enable SSH during provisioning when a CIDR is provided
-          if [ -n "${{ secrets.SSH_ALLOWED_CIDR }}" ]; then
-            ALLOW_SSH=true
-          else
-            ALLOW_SSH=false
-          fi
+          # Always allow SSH during provisioning from the runner CIDR (and optional extra CIDRs)
+          ALLOW_SSH=true
           cat > terraform.tfvars <<EOF
           aws_region = "eu-central-1"
           instance_type = ""
@@ -216,6 +212,13 @@ jobs:
 
           chmod 600 ~/.ssh/deploy_key
 
+          DERIVED_PUB=$(ssh-keygen -y -f ~/.ssh/deploy_key)
+          if [ "$DERIVED_PUB" != "${{ secrets.SSH_PUBLIC_KEY }}" ]; then
+            echo "ERROR: SSH_PUBLIC_KEY does not match EC2_SSH_PRIVATE_KEY."
+            echo "Derived public key: $DERIVED_PUB"
+            exit 1
+          fi
+
           # We rely on SSH's StrictHostKeyChecking=accept-new (set in Ansible inventory)
           # to add the host key on first connection instead of ssh-keyscan.
 
@@ -258,10 +261,6 @@ jobs:
       - name: Disable SSH access after deployment
         if: inputs.terraform_action == 'apply'
         run: |
-          if [ -z "${{ secrets.SSH_ALLOWED_CIDR }}" ]; then
-            echo "SSH_ALLOWED_CIDR not set; skipping SSH disable step."
-            exit 0
-          fi
           cd terraform
           SSH_CIDRS="\"${{ steps.detect-ip.outputs.RUNNER_CIDR }}\""
           if [ -n "${{ secrets.SSH_ALLOWED_CIDR }}" ]; then
