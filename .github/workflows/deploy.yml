@@ -182,8 +182,8 @@ jobs:
       - name: Wait for EC2 to be ready
         if: inputs.terraform_action == 'apply'
         run: |
-          echo "Waiting 60 seconds for EC2 user-data to complete..."
-          sleep 60
+          echo "Waiting 100 seconds for EC2 user-data to complete..."
+          sleep 100
 
       - name: Install Ansible
         if: inputs.terraform_action == 'apply'
