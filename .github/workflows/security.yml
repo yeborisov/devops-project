@@ -42,18 +42,26 @@ jobs:
             echo "Bandit failed with exit code $BANDIT_EXIT"
             exit $BANDIT_EXIT
           fi
+          if [ ! -s reports/bandit.txt ]; then
+            echo "No issues found" > reports/bandit.txt
+          fi
+          echo "BANDIT_EXIT=$BANDIT_EXIT" >> $GITHUB_ENV
           exit 0
 
       - name: Run pip-audit (dependency vulnerability scan)
         run: |
           set +e
-          pip-audit -r requirements.txt > reports/pip-audit.txt
+          pip-audit -r requirements.txt > reports/pip-audit.txt 2>&1
           PIPAUDIT_EXIT=$?
           # pip-audit: 0=no issues, 1=issues found, >1=configuration/runtime error
           if [ $PIPAUDIT_EXIT -gt 1 ]; then
             echo "pip-audit failed with exit code $PIPAUDIT_EXIT"
             exit $PIPAUDIT_EXIT
           fi
+          if [ ! -s reports/pip-audit.txt ]; then
+            echo "No issues found" > reports/pip-audit.txt
+          fi
+          echo "PIPAUDIT_EXIT=$PIPAUDIT_EXIT" >> $GITHUB_ENV
           exit 0
 
       - name: Run Trivy FS scan
@@ -67,6 +75,12 @@ jobs:
           output: 'reports/trivy.txt'
           exit-code: '0'
 
+      - name: Normalize Trivy output
+        run: |
+          if [ ! -s reports/trivy.txt ]; then
+            echo "No issues found" > reports/trivy.txt
+          fi
+
       - name: Combine security report
         run: |
           WORKFLOW_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
@@ -74,13 +88,13 @@ jobs:
           PIPAUDIT_STATUS="✅ No issues"
           TRIVY_STATUS="✅ No issues"
 
-          if ! grep -q "No issues identified" reports/bandit.txt; then
+          if [ "${BANDIT_EXIT:-0}" = "1" ]; then
             BANDIT_STATUS="⚠️ Issues found"
           fi
-          if ! grep -q "No known vulnerabilities found" reports/pip-audit.txt; then
+          if [ "${PIPAUDIT_EXIT:-0}" = "1" ]; then
             PIPAUDIT_STATUS="⚠️ Issues found"
           fi
-          if ! grep -q "Total: 0" reports/trivy.txt; then
+          if ! grep -q "No issues found" reports/trivy.txt && ! grep -q "Total: 0" reports/trivy.txt; then
             TRIVY_STATUS="⚠️ Issues found"
           fi
 
@@ -114,13 +128,13 @@ jobs:
         id: check-issues
         run: |
           HAS_ISSUES=false
-          if ! grep -q "No issues identified" reports/bandit.txt; then
+          if [ "${BANDIT_EXIT:-0}" = "1" ]; then
             HAS_ISSUES=true
           fi
-          if ! grep -q "No known vulnerabilities found" reports/pip-audit.txt; then
+          if [ "${PIPAUDIT_EXIT:-0}" = "1" ]; then
             HAS_ISSUES=true
           fi
-          if ! grep -q "Total: 0" reports/trivy.txt; then
+          if ! grep -q "No issues found" reports/trivy.txt && ! grep -q "Total: 0" reports/trivy.txt; then
             HAS_ISSUES=true
           fi
           echo "HAS_ISSUES=$HAS_ISSUES" >> $GITHUB_OUTPUT
