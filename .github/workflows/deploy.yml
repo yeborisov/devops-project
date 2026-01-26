@@ -190,8 +190,23 @@ jobs:
 
           chmod 600 ~/.ssh/deploy_key
 
-          # Add host to known_hosts. Let ssh-keyscan fail if there's an error so CI shows diagnostics.
-          ssh-keyscan -H ${{ steps.get-ip.outputs.EC2_IP }} >> ~/.ssh/known_hosts
+          # Add host to known_hosts with a timeout and retries for clearer diagnostics
+          for i in 1 2 3; do
+            echo "ssh-keyscan attempt $i..."
+            if timeout 10 ssh-keyscan -H ${{ steps.get-ip.outputs.EC2_IP }} >> ~/.ssh/known_hosts; then
+              echo "ssh-keyscan succeeded"
+              break
+            else
+              echo "ssh-keyscan failed (attempt $i)"
+              sleep 5
+            fi
+          done
+
+          # Final check: fail if no host key was added
+          if ! grep -q "${{ steps.get-ip.outputs.EC2_IP }}" ~/.ssh/known_hosts; then
+            echo "ERROR: ssh-keyscan did not add host key. Check SG port 22 and instance readiness."
+            exit 1
+          fi
 
       - name: Create Ansible inventory
         if: inputs.terraform_action == 'apply'
