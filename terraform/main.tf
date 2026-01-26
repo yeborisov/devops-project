@@ -65,13 +65,13 @@ resource "aws_security_group" "http" {
   }
 
   dynamic "ingress" {
-    for_each = var.allow_ssh && length(trimspace(var.ssh_allowed_cidr)) > 0 ? [1] : []
+    for_each = var.allow_ssh && length(var.ssh_allowed_cidrs) > 0 ? [1] : []
     content {
       description = "SSH"
       from_port   = 22
       to_port     = 22
       protocol    = "tcp"
-      cidr_blocks = [var.ssh_allowed_cidr]
+      cidr_blocks = var.ssh_allowed_cidrs
     }
   }
 

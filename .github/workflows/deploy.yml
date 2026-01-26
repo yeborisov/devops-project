@@ -39,6 +39,17 @@ jobs:
           terraform_version: "1.6.0"
           terraform_wrapper: false
 
+      - name: Detect GitHub runner public IP
+        id: detect-ip
+        run: |
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          if [ -z "$RUNNER_IP" ]; then
+            echo "Failed to detect runner public IP"
+            exit 1
+          fi
+          echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_OUTPUT
+          echo "Detected runner IP: $RUNNER_IP"
+
       - name: Setup Terraform Remote State Backend (if needed)
         run: |
           BUCKET_NAME="devops-project-terraform-state"
@@ -117,11 +128,16 @@ jobs:
       - name: Create Terraform tfvars
         run: |
           cd terraform
+          # Build SSH CIDR list: detected runner IP plus any additional CIDRs from secrets
+          SSH_CIDRS="\"${{ steps.detect-ip.outputs.RUNNER_IP }}/32\""
+          if [ -n "${{ secrets.SSH_ALLOWED_CIDR }}" ]; then
+            SSH_CIDRS="$SSH_CIDRS,\"${{ secrets.SSH_ALLOWED_CIDR }}\""
+          fi
           cat > terraform.tfvars <<EOF
           aws_region = "eu-central-1"
           instance_type = ""
           allow_ssh = true
-          ssh_allowed_cidr = "${{ secrets.SSH_ALLOWED_CIDR }}"
+          ssh_allowed_cidrs = [${SSH_CIDRS}]
           ssh_key_name = "devops-project-key"
           ssh_public_key = "${{ secrets.SSH_PUBLIC_KEY }}"
           EOF
