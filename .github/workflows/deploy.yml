@@ -48,7 +48,7 @@ jobs:
             echo "Failed to detect runner public IP"
             exit 1
           fi
-          RUNNER_CIDR=$(python -c "import ipaddress, os; ip=os.environ['RUNNER_IP']; print(ipaddress.ip_network(f'{ip}/17', strict=False))")
+          RUNNER_CIDR=$(python -c "import ipaddress; ip='${RUNNER_IP}'; print(ipaddress.ip_network(f'{ip}/17', strict=False))")
           echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_OUTPUT
           echo "RUNNER_CIDR=$RUNNER_CIDR" >> $GITHUB_OUTPUT
           echo "Detected runner IP: $RUNNER_IP"
